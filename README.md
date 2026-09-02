@@ -1,109 +1,173 @@
-<a href="https://demo-nextjs-with-supabase.vercel.app/">
-  <img alt="Next.js and Supabase Starter Kit - the fastest way to build apps with Next.js and Supabase" src="https://demo-nextjs-with-supabase.vercel.app/opengraph-image.png">
-  <h1 align="center">Next.js and Supabase Starter Kit</h1>
-</a>
+# Supabase Next.js Chatbot with Credits
 
-<p align="center">
- The fastest way to build apps with Next.js and Supabase
-</p>
+A Next.js 16 + Supabase starter project featuring a metered chatbot: every account starts with 10 free credits, every message costs 1 credit, and balances persist per-user in Supabase across devices and sessions.
 
-<p align="center">
-  <a href="#features"><strong>Features</strong></a> ·
-  <a href="#demo"><strong>Demo</strong></a> ·
-  <a href="#deploy-to-vercel"><strong>Deploy to Vercel</strong></a> ·
-  <a href="#clone-and-run-locally"><strong>Clone and run locally</strong></a> ·
-  <a href="#feedback-and-issues"><strong>Feedback and issues</strong></a>
-  <a href="#more-supabase-examples"><strong>More Examples</strong></a>
-</p>
-<br/>
+Built on top of [Vercel's `with-supabase` example](https://github.com/vercel/next.js/tree/canary/examples/with-supabase).
 
 ## Features
 
-- Works across the entire [Next.js](https://nextjs.org) stack
-  - App Router
-  - Pages Router
-  - Proxy
-  - Client
-  - Server
-  - It just works!
-- supabase-ssr. A package to configure Supabase Auth to use cookies
-- Password-based authentication block installed via the [Supabase UI Library](https://supabase.com/ui/docs/nextjs/password-based-auth)
-- Styling with [Tailwind CSS](https://tailwindcss.com)
-- Components with [shadcn/ui](https://ui.shadcn.com/)
-- Optional deployment with [Supabase Vercel Integration and Vercel deploy](#deploy-your-own)
-  - Environment variables automatically assigned to Vercel project
+- **Authentication** — sign up, login, logout, password reset (via Supabase Auth)
+- **Per-user credit system** — 10 free credits on signup, 1 credit deducted per chatbot message, enforced atomically in the database
+- **Chatbot** — powered by Gemini 2.5 Flash Lite
+- **Persistent sessions** — credit balance and login state survive logout/login and device changes
+- **Route protection** — `/chatbot` requires authentication; unauthenticated visitors are redirected to login
 
-## Demo
+## Tech Stack
 
-You can view a fully working demo at [demo-nextjs-with-supabase.vercel.app](https://demo-nextjs-with-supabase.vercel.app/).
+| Layer | Choice |
+|---|---|
+| Framework | Next.js 16 (App Router, Turbopack) |
+| Auth & DB | Supabase (Postgres + Supabase Auth) |
+| Styling | Tailwind CSS + shadcn/ui |
+| Language | TypeScript |
+| AI | Google Gemini 2.5 Flash Lite |
 
-## Deploy to Vercel
+## Project Structure
 
-Vercel deployment will guide you through creating a Supabase account and project.
+```
+app/
+├── auth/                 # Login, sign-up, password reset, email confirm
+├── chatbot/
+│   ├── layout.tsx        # Nav bar wrapper (username, logout, theme)
+│   └── page.tsx           # Chat UI, protected route
+├── api/chat/route.ts     # Auth check → credit deduction (RPC) → Gemini call
+├── layout.tsx             # Root layout, fonts, ThemeProvider, bfcache guard
+└── page.tsx                # Home page
 
-After installation of the Supabase integration, all relevant environment variables will be assigned to the project so the deployment is fully functioning.
+components/
+├── ui/                    # shadcn/ui primitives
+├── site-nav.tsx           # Shared nav bar (used on home + chatbot)
+├── auth-button.tsx        # Server component: shows user email + logout, or sign in/up
+├── login-form.tsx / sign-up-form.tsx / logout-button.tsx
+├── chat-interface.tsx     # Client-side chat UI, credit display, message handling
+└── bfcache-guard.tsx      # Forces reload on back/forward cache restore
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fvercel%2Fnext.js%2Ftree%2Fcanary%2Fexamples%2Fwith-supabase&project-name=nextjs-with-supabase&repository-name=nextjs-with-supabase&demo-title=nextjs-with-supabase&demo-description=This+starter+configures+Supabase+Auth+to+use+cookies%2C+making+the+user%27s+session+available+throughout+the+entire+Next.js+app+-+Client+Components%2C+Server+Components%2C+Route+Handlers%2C+Server+Actions+and+Middleware.&demo-url=https%3A%2F%2Fdemo-nextjs-with-supabase.vercel.app%2F&external-id=https%3A%2F%2Fgithub.com%2Fvercel%2Fnext.js%2Ftree%2Fcanary%2Fexamples%2Fwith-supabase&demo-image=https%3A%2F%2Fdemo-nextjs-with-supabase.vercel.app%2Fopengraph-image.png)
+lib/
+├── supabase/
+│   ├── client.ts          # Browser Supabase client
+│   ├── server.ts          # Server Supabase client
+│   └── proxy.ts            # updateSession() — used by root proxy.ts
+├── credits.ts              # getUserCredits() helper
+└── utils.ts                 # cn() helper, hasEnvVars check
 
-The above will also clone the Starter kit to your GitHub, you can clone that locally and develop locally.
+proxy.ts                    # Next.js 16 request interceptor (formerly middleware.ts)
+```
 
-If you wish to just develop locally and not deploy to Vercel, [follow the steps below](#clone-and-run-locally).
+## Setup
 
-## Clone and run locally
+### 1. Install dependencies
 
-1. You'll first need a Supabase project which can be made [via the Supabase dashboard](https://database.new)
+```bash
+npm install
+```
 
-2. Create a Next.js app using the Supabase Starter template npx command
+### 2. Environment variables
 
-   ```bash
-   npx create-next-app --example with-supabase with-supabase-app
-   ```
+Create `.env.local` in the project root:
 
-   ```bash
-   yarn create next-app --example with-supabase with-supabase-app
-   ```
+```env
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your_supabase_publishable_or_anon_key
+GEMINI_API_KEY=your_gemini_api_key
+```
 
-   ```bash
-   pnpm create next-app --example with-supabase with-supabase-app
-   ```
+Get Supabase values from **Project Settings → API**. Get a Gemini key from [Google AI Studio](https://aistudio.google.com/apikey).
 
-3. Use `cd` to change into the app's directory
+> `GEMINI_API_KEY` has no `NEXT_PUBLIC_` prefix on purpose — it's server-only and never reaches the browser.
 
-   ```bash
-   cd with-supabase-app
-   ```
+### 3. Set up the database
 
-4. Rename `.env.example` to `.env.local` and update the following:
+Run this in Supabase's **SQL Editor**:
 
-  ```env
-  NEXT_PUBLIC_SUPABASE_URL=[INSERT SUPABASE PROJECT URL]
-  NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=[INSERT SUPABASE PROJECT API PUBLISHABLE OR ANON KEY]
-  ```
-  > [!NOTE]
-  > This example uses `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, which refers to Supabase's new **publishable** key format.
-  > Both legacy **anon** keys and new **publishable** keys can be used with this variable name during the transition period. Supabase's dashboard may show `NEXT_PUBLIC_SUPABASE_ANON_KEY`; its value can be used in this example.
-  > See the [full announcement](https://github.com/orgs/supabase/discussions/29260) for more information.
+```sql
+-- Credits table
+create table credits (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null unique references auth.users(id) on delete cascade,
+  credits_count int not null default 10,
+  user_email text not null,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
 
-  Both `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` can be found in [your Supabase project's API settings](https://supabase.com/dashboard/project/_?showConnect=true)
+create index idx_credits_user_id on credits(user_id);
 
-5. You can now run the Next.js local development server:
+alter table credits enable row level security;
 
-   ```bash
-   npm run dev
-   ```
+create policy "Users can read their own credits"
+  on credits for select
+  using (auth.uid() = user_id);
 
-   The starter kit should now be running on [localhost:3000](http://localhost:3000/).
+create policy "Users can insert their own credits row"
+  on credits for insert
+  with check (auth.uid() = user_id);
 
-6. This template comes with the default shadcn/ui style initialized. If you instead want other ui.shadcn styles, delete `components.json` and [re-install shadcn/ui](https://ui.shadcn.com/docs/installation/next)
+-- Atomic decrement — prevents race conditions and negative balances
+create or replace function decrement_credit(p_user_id uuid)
+returns int
+language plpgsql
+security definer
+as $$
+declare
+  new_balance int;
+begin
+  update credits
+  set credits_count = credits_count - 1,
+      updated_at = now()
+  where user_id = p_user_id and credits_count > 0
+  returning credits_count into new_balance;
 
-> Check out [the docs for Local Development](https://supabase.com/docs/guides/getting-started/local-development) to also run Supabase locally.
+  if new_balance is null then
+    raise exception 'INSUFFICIENT_CREDITS';
+  end if;
 
-## Feedback and issues
+  return new_balance;
+end;
+$$;
 
-Please file feedback and issues over on the [Supabase GitHub org](https://github.com/supabase/supabase/issues/new/choose).
+-- Auto-create a credits row (10 free credits) on signup
+create or replace function handle_new_user_credits()
+returns trigger
+language plpgsql
+security definer
+as $$
+begin
+  insert into public.credits (user_id, credits_count, user_email)
+  values (new.id, 10, new.email);
+  return new;
+end;
+$$;
 
-## More Supabase examples
+create trigger on_auth_user_created_credits
+  after insert on auth.users
+  for each row execute function handle_new_user_credits();
+```
 
-- [Next.js Subscription Payments Starter](https://github.com/vercel/nextjs-subscription-payments)
-- [Cookie-based Auth and the Next.js 13 App Router (free course)](https://youtube.com/playlist?list=PL5S4mPUpp4OtMhpnp93EFSo42iQ40XjbF)
-- [Supabase Auth and the Next.js App Router](https://github.com/supabase/supabase/tree/master/examples/auth/nextjs)
+### 4. Run locally
+
+```bash
+npm run dev
+```
+
+Visit `http://localhost:3000`.
+
+## How the Credit System Works
+
+1. On signup, a database trigger creates a `credits` row with `credits_count = 10`.
+2. Sending a chatbot message calls `POST /api/chat`, which:
+   - Verifies the user is authenticated
+   - Calls `decrement_credit(user_id)` via RPC — an atomic Postgres function that fails safely if the balance is already 0 (no negative balances, no race conditions from rapid clicks)
+   - Calls Gemini for a response
+   - Returns the reply plus the new balance
+3. Balances live in Supabase, not browser storage, so they persist across logout/login and across devices.
+
+## Notes on This Next.js 16 Project
+
+- **`proxy.ts`, not `middleware.ts`** — Next.js 16 renamed the root request-interceptor file and its exported function (`proxy` instead of `middleware`). This project's `proxy.ts` calls `updateSession()` from `lib/supabase/proxy.ts` to refresh the session and redirect unauthenticated requests, and also sets `Cache-Control: no-store` to avoid serving stale authenticated pages from cache.
+- **`export const instant = false`** on `app/chatbot/page.tsx` — this project has Cache Components enabled, which requires routes to be prerenderable by default. Since `/chatbot` reads live session data, it's explicitly opted out of prerendering.
+- **`components/bfcache-guard.tsx`** — forces a reload if a page is restored from the browser's back-forward cache, so logout/login state is never shown stale via the back button.
+
+## Known Limitations / Next Steps
+
+- Email confirmation is currently **disabled** in this Supabase project for easier local testing. Re-enable it under **Authentication → Providers → Email** before shipping to real users, and configure custom SMTP (Resend, SendGrid, etc.) — Supabase's default email sender is rate-limited and not meant for production.
+- No "buy more credits" flow yet — credits are currently a fixed one-time grant of 10 per account.
